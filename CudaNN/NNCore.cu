@@ -176,11 +176,14 @@ namespace NN {
             } else
                 throw std::runtime_error("Activation function not supported");
 
-            layers[i + 1].cpDtoHAsync();
-            layersZ[i + 1].cpDtoHAsync();
+            // layers[i + 1].cpDtoHAsync();
+            // layersZ[i + 1].cpDtoHAsync();
             //w[i + 1].cpDtoHAsync();
             //b[i + 1].cpDtoHAsync();
         }
+
+        layers[size-1].cpDtoHAsync();
+        layersZ[size - 1].cpDtoHAsync();
 
         cudaStreamSynchronize(stream);
         cudaStreamDestroy(stream);

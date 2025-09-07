@@ -9,12 +9,23 @@ using namespace Eigen;
 
 int main() {
     int v_dim = 784;
-    int h_dim = 60;
+    vector h_dims = {100,60};
     int epochs = 20;
     int n_samples = 1000;
     double lr = 0.05;
 
-    DBN dbn(v_dim, h_dim);
+    // 初始化 NN
+    float Srate = 0.1;
+    vector<NN::NNCore::LayerStructure> layerStructure = {
+        {h_dims[h_dims.size() - 1], ""},
+        {128, "ReLU"},
+        {64, "ReLU"},
+        {10, "sigmoid"}
+    };
+    int termsOfTrain = 1;
+
+    DBN dbn(v_dim, h_dims[0]);
+    h_dims.erase(h_dims.begin());
 
     // 读取数据
     auto trainInData = readData::readData::readImageData("../Data/train-images.idx3-ubyte");
@@ -31,7 +42,6 @@ int main() {
         data.push_back(v);
     }
 
-    // 预训练 DBN
     for (int epoch = 1; epoch <= epochs; epoch++) {
         double total_err = 0.0;
         for (auto &v : data) {
@@ -42,39 +52,50 @@ int main() {
              << total_err / n_samples << endl;
     }
 
+    // 预训练 DBN
+    for (auto h_dim: h_dims) {
+        dbn.add_layer(h_dim);
+        for (int epoch = 1; epoch <= epochs; epoch++) {
+            double total_err = 0.0;
+            for (auto &v : data) {
+                dbn.update(v, lr);
+                total_err += dbn.reconstruction_error(v);
+            }
+            cout << "Epoch " << epoch << " avg recon error = "
+                 << total_err / n_samples << endl;
+        }
+    }
+
     // 提取特征
     vector<vector<float>> hiddenTrain = dbn.get_hidden_layer_value(trainInData);
     vector<vector<float>> hiddenTest  = dbn.get_hidden_layer_value(testInData);
 
-    // 初始化 NN
-    float Srate = 0.1;
-    vector<NN::NNCore::LayerStructure> layerStructure = {
-        {h_dim, ""},
-        {128, "ReLU"},
-        {64, "ReLU"},
-        {10, "sigmoid"}
-    };
     auto *nn = new NN::NNCore(layerStructure, Srate);
 
-    int termsOfTrain = 1;
-    for (int j = 0; j < termsOfTrain; j++) {
-        cout << "Epoch: " << j << endl;
-        vector<vector<float>> wrongData;
-        vector<int> correctData;
+    bool w = true;
+    while (w) {
+        for (int j = 0; j < termsOfTrain; j++) {
+            cout << "Epoch: " << j << endl;
+            vector<vector<float>> wrongData;
+            vector<int> correctData;
 
-        nn->train_with_retrain(hiddenTrain, trainOutData, wrongData, correctData, true);
+            nn->train_with_retrain(hiddenTrain, trainOutData, wrongData, correctData, true);
 
-        float acc = nn->test(hiddenTest, testOutData);
-        nn->save("Model_Epoch" + to_string(j) + "_With_Rate_" + to_string(acc*100) + "%.module");
+            float acc = nn->test(hiddenTest, testOutData);
+            nn->save("Model_Epoch" + to_string(j) + "_With_Rate_" + to_string(acc*100) + "%.module");
 
-        Srate *= 0.75;
-        nn->changeStudyRate(Srate);
+            Srate *= 0.75;
+            nn->changeStudyRate(Srate);
+        }
+        cout<<"keep training? 1 for yes 0 for no"<<endl;
+        cin>>w;
     }
 
     delete nn;
     return 0;
 }
 /*
+ h_size = 60
  Epoch 1 avg recon error = 42.7371
 Epoch 2 avg recon error = 31.863
 Epoch 3 avg recon error = 28.9144
